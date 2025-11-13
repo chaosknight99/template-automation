@@ -1,0 +1,85 @@
+name: Generate Bicep Param File from Issue
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  create-bicepparam:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'bicep')
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Parse Issue to JSON
+        id: parse
+        uses: issue-ops/parser@v3
+        with:
+          body: ${{ github.event.issue.body }}
+
+      - name: Generate Bicep Param File
+        id: bicepparam
+        run: |
+          #!/bin/bash
+          
+          # Get parsed values
+          INSTANCE_COUNT="${{ fromJSON(steps.parse.outputs.json).instanceCount }}"
+          INSTANCE_NAME="${{ fromJSON(steps.parse.outputs.json).instanceName }}"
+          ALLOWED_LOCATIONS="${{ fromJSON(steps.parse.outputs.json).allowedLocations }}"
+          TAGS="${{ fromJSON(steps.parse.outputs.json).tags }}"
+          
+          # Parse array (comma-separated string to bicep array)
+          IFS=',' read -ra locs <<< "$ALLOWED_LOCATIONS"
+          arrStr=""
+          for loc in "${locs[@]}"; do
+            # Trim whitespace
+            loc=$(echo "$loc" | xargs)
+            arrStr="${arrStr}  '${loc}'\n"
+          done
+          # Remove trailing newline and comma
+          arrStr=$(echo -e "$arrStr" | sed '$ s/$//')
+          
+          # Parse object (key:value lines to bicep object)
+          tagsStr=""
+          while IFS=':' read -r key value; do
+            if [[ -n "$key" && -n "$value" ]]; then
+              key=$(echo "$key" | xargs)
+              value=$(echo "$value" | xargs)
+              tagsStr="${tagsStr}  ${key}: '${value}'\n"
+            fi
+          done <<< "$TAGS"
+          tagsStr=$(echo -e "$tagsStr" | sed '$ s/$//')
+          
+          # Create the bicepparam file
+          cat > params${{ github.event.issue.number }}.bicepparam << 'EOF'
+          param instanceCount int = ${INSTANCE_COUNT}
+          param instanceName string = '${INSTANCE_NAME}'
+          param allowedLocations array = [
+          ${arrStr}]
+          param tags object = {
+          ${tagsStr}
+          }
+          EOF
+          
+          echo "Generated param file:"
+          cat params${{ github.event.issue.number }}.bicepparam
+
+      - name: Commit and Push Bicep Param File
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add params${{ github.event.issue.number }}.bicepparam
+          git commit -m "Add bicepparam file for issue #${{ github.event.issue.number }}"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on Issue
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Bicep parameter file `params${{ github.event.issue.number }}.bicepparam` has been created and committed to the repository!'
+            })
