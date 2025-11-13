@@ -8,8 +8,7 @@ body:
     attributes:
       label: Instance Count
       description: Number of instances (integer)
-            placeholder: "3"
-      
+      placeholder: "3"
     validations:
       required: true
   - type: input
