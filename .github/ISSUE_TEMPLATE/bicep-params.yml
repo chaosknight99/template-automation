@@ -1,0 +1,39 @@
+name: Bicep Parameters
+description: Provide values to generate a Bicep parameter file.
+title: "[Bicep Params] "
+labels: ["automation", "bicep"]
+body:
+  - type: input
+    id: instanceCount
+    attributes:
+      label: Instance Count
+      description: Number of instances (integer)
+      placeholder: 3
+    validations:
+      required: true
+  - type: input
+    id: instanceName
+    attributes:
+      label: Instance Name
+      description: Name of the instance (string)
+      placeholder: myAppInstance
+    validations:
+      required: true
+  - type: textarea
+    id: allowedLocations
+    attributes:
+      label: Allowed Locations
+      description: Comma separated list of locations (array)
+      placeholder: eastus, westus2, centralus
+    validations:
+      required: true
+  - type: textarea
+    id: tags
+    attributes:
+      label: Tags (object)
+      description: One tag per line, format key:value
+      placeholder: |
+        environment:production
+        department:finance
+    validations:
+      required: true
